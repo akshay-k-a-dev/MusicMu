@@ -1,0 +1,19 @@
+name: Run start.sh (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  run-start-script:
+    name: Execute start.sh
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Give execution permission to start.sh
+        run: chmod +x ./start.sh
+
+      - name: Run start.sh
+        run: ./start.sh
