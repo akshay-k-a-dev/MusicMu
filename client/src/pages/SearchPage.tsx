@@ -46,19 +46,30 @@ export function SearchPage() {
     <div className="max-w-6xl mx-auto space-y-6">
       {/* Search Header */}
       <div>
-        <h1 className="text-4xl font-black mb-6">Search</h1>
+        <h1 className="text-3xl md:text-4xl font-black mb-4 md:mb-6">Search</h1>
         <form onSubmit={handleSearch} className="relative">
           <SearchIcon
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
             size={20}
           />
           <input
-            type="text"
+            type="search"
+            inputMode="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="What do you want to listen to?"
-            className="w-full bg-white/10 border-0 rounded-full px-12 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20"
+            className="w-full bg-white/10 border-0 rounded-full px-12 py-3 md:py-4 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-white/20 text-base"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
           />
+          <button
+            type="submit"
+            className="absolute right-2 top-1/2 -translate-y-1/2 bg-white text-black px-4 py-1.5 md:px-6 md:py-2 rounded-full font-semibold hover:bg-gray-200 transition-colors text-sm md:text-base"
+          >
+            Search
+          </button>
         </form>
       </div>
 
@@ -72,8 +83,8 @@ export function SearchPage() {
       {/* Results Grid */}
       {!loading && results.length > 0 && (
         <div>
-          <h2 className="text-2xl font-bold mb-4">Top Results</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <h2 className="text-xl md:text-2xl font-bold mb-4">Top Results</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
             {results.map((track, index) => {
               const isPlaying =
                 currentTrack?.videoId === track.videoId && state === 'playing';
@@ -84,9 +95,9 @@ export function SearchPage() {
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: index * 0.05 }}
-                    className="bg-white/5 hover:bg-white/10 rounded-lg p-4 cursor-pointer group transition-all"
+                    className="bg-white/5 hover:bg-white/10 active:bg-white/15 rounded-lg p-3 md:p-4 cursor-pointer group transition-all"
                   >
-                    <div className="relative mb-4" onClick={() => handlePlay(track)}>
+                    <div className="relative mb-3 md:mb-4" onClick={() => handlePlay(track)}>
                       <img
                         src={track.thumbnail}
                         alt={track.title}
@@ -95,20 +106,21 @@ export function SearchPage() {
                       <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         whileHover={{ opacity: 1, y: 0 }}
+                        whileTap={{ opacity: 1, y: 0 }}
                         className="absolute bottom-2 right-2"
                       >
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          className="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center shadow-xl hover:bg-green-400 transition-colors"
+                          className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-green-500 flex items-center justify-center shadow-xl hover:bg-green-400 active:bg-green-600 transition-colors"
                         >
                           {isPlaying ? (
-                            <Pause size={20} fill="black" className="text-black" />
+                            <Pause size={18} fill="black" className="text-black md:w-5 md:h-5" />
                           ) : (
                             <Play
-                              size={20}
+                              size={18}
                               fill="black"
-                              className="text-black ml-0.5"
+                              className="text-black ml-0.5 md:w-5 md:h-5"
                             />
                           )}
                         </motion.button>
@@ -116,8 +128,8 @@ export function SearchPage() {
                     </div>
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold truncate mb-1">{track.title}</h3>
-                        <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                        <h3 className="font-semibold truncate mb-1 text-sm md:text-base">{track.title}</h3>
+                        <p className="text-xs md:text-sm text-gray-400 truncate">{track.artist}</p>
                         <p className="text-xs text-gray-500 mt-1">
                           {formatDuration(track.duration)}
                         </p>
@@ -126,10 +138,10 @@ export function SearchPage() {
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
                         onClick={(e) => handleAddToQueue(e, track)}
-                        className="p-2 rounded-full hover:bg-white/10 transition-colors flex-shrink-0"
+                        className="p-2 rounded-full hover:bg-white/10 active:bg-white/20 transition-colors flex-shrink-0"
                         title="Add to queue"
                       >
-                        <Plus size={20} className="text-gray-400 hover:text-white" />
+                        <Plus size={18} className="text-gray-400 hover:text-white md:w-5 md:h-5" />
                       </motion.button>
                     </div>
                   </motion.div>
@@ -141,12 +153,12 @@ export function SearchPage() {
 
       {/* Empty State */}
       {!loading && results.length === 0 && !query && (
-        <div className="text-center py-20">
-          <SearchIcon size={64} className="mx-auto mb-4 text-gray-700" />
-          <h3 className="text-2xl font-bold text-gray-400 mb-2">
+        <div className="text-center py-12 md:py-20">
+          <SearchIcon size={48} className="mx-auto mb-4 text-gray-700 md:w-16 md:h-16" />
+          <h3 className="text-xl md:text-2xl font-bold text-gray-400 mb-2">
             Search for songs and artists
           </h3>
-          <p className="text-gray-500">
+          <p className="text-sm md:text-base text-gray-500">
             Find your favorite music from YouTube
           </p>
         </div>
@@ -154,12 +166,12 @@ export function SearchPage() {
 
       {/* No Results */}
       {!loading && results.length === 0 && query && (
-        <div className="text-center py-20">
-          <SearchIcon size={64} className="mx-auto mb-4 text-gray-700" />
-          <h3 className="text-2xl font-bold text-gray-400 mb-2">
+        <div className="text-center py-12 md:py-20">
+          <SearchIcon size={48} className="mx-auto mb-4 text-gray-700 md:w-16 md:h-16" />
+          <h3 className="text-xl md:text-2xl font-bold text-gray-400 mb-2">
             No results found for "{query}"
           </h3>
-          <p className="text-gray-500">Try different keywords</p>
+          <p className="text-sm md:text-base text-gray-500">Try different keywords</p>
         </div>
       )}
     </div>
