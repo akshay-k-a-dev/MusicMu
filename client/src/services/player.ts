@@ -163,7 +163,19 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
             trackProgress();
             
           } else if (event.data === YT.PlayerState.PAUSED) {
-            set({ state: 'paused' });
+            // Only set paused state if page is visible (user-initiated pause)
+            // If page is hidden, it's likely auto-pause from YouTube - ignore it
+            if (document.visibilityState === 'visible') {
+              set({ state: 'paused' });
+            } else {
+              console.log('⚠️ Ignoring auto-pause in background, resuming...');
+              // Immediately resume playback
+              setTimeout(() => {
+                if (get().state === 'playing') {
+                  player.playVideo();
+                }
+              }, 100);
+            }
           } else if (event.data === YT.PlayerState.BUFFERING) {
             set({ state: 'loading' });
           } else if (event.data === YT.PlayerState.ENDED) {
@@ -181,6 +193,54 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
     });
 
     set({ ytPlayer: player });
+    
+    // Prevent automatic pause on visibility change (background/foreground switch)
+    document.addEventListener('visibilitychange', () => {
+      const { state: playerState, ytPlayer: currentPlayer } = get();
+      
+      if (document.visibilityState === 'hidden') {
+        // App going to background
+        console.log('📱 App going to background, keeping playback active');
+        // Don't do anything - let it continue playing
+      } else if (document.visibilityState === 'visible') {
+        // App coming to foreground
+        console.log('📱 App coming to foreground');
+        
+        // If player was playing before but got paused by YouTube's auto-pause,
+        // resume it immediately
+        if (playerState === 'playing' && currentPlayer) {
+          const ytState = currentPlayer.getPlayerState();
+          const YT = window.YT;
+          
+          if (ytState === YT.PlayerState.PAUSED) {
+            console.log('🔄 Auto-resuming playback after visibility change');
+            currentPlayer.playVideo();
+          }
+        }
+      }
+    });
+    
+    // Also handle when the page loses/gains focus
+    window.addEventListener('blur', () => {
+      console.log('📱 Window lost focus, maintaining playback');
+      // Keep playing - don't pause
+    });
+    
+    window.addEventListener('focus', () => {
+      const { state: playerState, ytPlayer: currentPlayer } = get();
+      console.log('📱 Window gained focus');
+      
+      // Resume if it was paused while in background
+      if (playerState === 'playing' && currentPlayer) {
+        const ytState = currentPlayer.getPlayerState();
+        const YT = window.YT;
+        
+        if (ytState === YT.PlayerState.PAUSED) {
+          console.log('🔄 Auto-resuming playback after focus');
+          currentPlayer.playVideo();
+        }
+      }
+    });
   },
 
   search: async (query: string) => {
