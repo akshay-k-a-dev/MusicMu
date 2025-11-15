@@ -95,6 +95,22 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
         }
       },
     });
+    
+    // 🔥 WATCHDOG: Continuously monitor and force resume if paused in background
+    setInterval(() => {
+      const { state, ytPlayer, ytPlayerReady } = get();
+      
+      // Only run watchdog if we should be playing and page is hidden
+      if (state === 'playing' && ytPlayer && ytPlayerReady && document.visibilityState === 'hidden') {
+        const YT = window.YT;
+        const ytState = ytPlayer.getPlayerState();
+        
+        if (ytState === YT.PlayerState.PAUSED) {
+          console.log('🐕 WATCHDOG: Detected pause in background, force resuming');
+          ytPlayer.playVideo();
+        }
+      }
+    }, 1000); // Check every second
   },
 
   initYouTubePlayer: async () => {
@@ -160,18 +176,23 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
             trackProgress();
             
           } else if (event.data === YT.PlayerState.PAUSED) {
-            // Only set paused state if page is visible (user-initiated pause)
-            // If page is hidden, it's likely auto-pause from YouTube - ignore it
+            // AGGRESSIVE: Only accept pause if page is visible AND we're actually pausing
             if (document.visibilityState === 'visible') {
               set({ state: 'paused' });
             } else {
-              console.log('⚠️ Ignoring auto-pause in background, resuming...');
-              // Immediately resume playback
-              setTimeout(() => {
-                if (get().state === 'playing') {
+              // Background auto-pause detected - FORCE RESUME immediately
+              console.log('⚠️ YouTube auto-paused in background - FORCE RESUMING NOW');
+              
+              // Try multiple times to ensure it resumes (aggressive approach)
+              const forceResume = () => {
+                if (get().state === 'playing' && player) {
                   player.playVideo();
                 }
-              }, 100);
+              };
+              
+              setTimeout(forceResume, 50);
+              setTimeout(forceResume, 100);
+              setTimeout(forceResume, 200);
             }
           } else if (event.data === YT.PlayerState.BUFFERING) {
             set({ state: 'loading' });
@@ -191,51 +212,66 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
 
     set({ ytPlayer: player });
     
-    // Prevent automatic pause on visibility change (background/foreground switch)
+    // ✅ AGGRESSIVE: Prevent YouTube auto-pause on visibility change
     document.addEventListener('visibilitychange', () => {
       const { state: playerState, ytPlayer: currentPlayer } = get();
       
       if (document.visibilityState === 'hidden') {
-        // App going to background
-        console.log('📱 App going to background, keeping playback active');
-        // Don't do anything - let it continue playing
+        // App going to background - FORCE resume after YouTube auto-pauses
+        console.log('📱 App going to background, forcing playback to continue');
+        
+        // Aggressively resume within 80ms (before YouTube fully pauses)
+        setTimeout(() => {
+          if (currentPlayer && playerState === 'playing') {
+            const ytState = currentPlayer.getPlayerState();
+            const YT = window.YT;
+            
+            if (ytState === YT.PlayerState.PAUSED) {
+              console.log('🔄 FORCE-RESUMING after YouTube auto-pause');
+              currentPlayer.playVideo();
+            }
+          }
+        }, 80);
+        
       } else if (document.visibilityState === 'visible') {
         // App coming to foreground
         console.log('📱 App coming to foreground');
         
-        // If player was playing before but got paused by YouTube's auto-pause,
-        // resume it immediately
+        // Re-acquire wake lock
+        mediaSessionManager.acquireWakeLock();
+        
+        // Check if we need to resume
         if (playerState === 'playing' && currentPlayer) {
           const ytState = currentPlayer.getPlayerState();
           const YT = window.YT;
           
           if (ytState === YT.PlayerState.PAUSED) {
-            console.log('🔄 Auto-resuming playback after visibility change');
+            console.log('🔄 Auto-resuming playback after returning to foreground');
             currentPlayer.playVideo();
           }
         }
       }
     });
     
-    // Also handle when the page loses/gains focus
-    window.addEventListener('blur', () => {
-      console.log('📱 Window lost focus, maintaining playback');
-      // Keep playing - don't pause
+    // Handle page freeze/unfreeze events (PWA lifecycle)
+    document.addEventListener('freeze', () => {
+      console.log('📱 Page frozen, attempting to keep playback alive');
     });
     
-    window.addEventListener('focus', () => {
+    document.addEventListener('resume', () => {
+      console.log('📱 Page resumed');
       const { state: playerState, ytPlayer: currentPlayer } = get();
-      console.log('📱 Window gained focus');
       
-      // Resume if it was paused while in background
       if (playerState === 'playing' && currentPlayer) {
-        const ytState = currentPlayer.getPlayerState();
-        const YT = window.YT;
-        
-        if (ytState === YT.PlayerState.PAUSED) {
-          console.log('🔄 Auto-resuming playback after focus');
-          currentPlayer.playVideo();
-        }
+        setTimeout(() => {
+          const ytState = currentPlayer.getPlayerState();
+          const YT = window.YT;
+          
+          if (ytState === YT.PlayerState.PAUSED) {
+            console.log('🔄 Force resume after page resume');
+            currentPlayer.playVideo();
+          }
+        }, 50);
       }
     });
   },

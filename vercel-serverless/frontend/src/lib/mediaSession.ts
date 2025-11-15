@@ -89,16 +89,29 @@ class MediaSessionManagerImpl implements MediaSessionManager {
         this.wakeLock = await (navigator as any).wakeLock.request('screen');
         console.log('🔒 Wake lock acquired - screen will stay on');
 
-        // Re-acquire wake lock when visibility changes
-        document.addEventListener('visibilitychange', async () => {
-          if (this.wakeLock !== null && document.visibilityState === 'visible') {
-            this.wakeLock = await (navigator as any).wakeLock.request('screen');
-            console.log('🔒 Wake lock re-acquired');
-          }
+        this.wakeLock.addEventListener('release', () => {
+          console.log('🔓 Wake lock was released');
         });
+
+        // CRITICAL: Re-acquire wake lock when visibility changes back to visible
+        const handleVisibilityChange = async () => {
+          if (this.wakeLock !== null && document.visibilityState === 'visible') {
+            try {
+              this.wakeLock = await (navigator as any).wakeLock.request('screen');
+              console.log('🔒 Wake lock re-acquired after visibility change');
+            } catch (err) {
+              console.error('Failed to re-acquire wake lock:', err);
+            }
+          }
+        };
+
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
       } catch (err: any) {
-        console.error('Failed to acquire wake lock:', err.message);
+        console.error('❌ Failed to acquire wake lock:', err.message);
       }
+    } else {
+      console.warn('⚠️ Wake Lock API not supported');
     }
   }
 
