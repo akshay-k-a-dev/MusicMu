@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "tsx dev-server.ts",
     "vercel-dev": "vercel dev",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "build": "echo 'No build step required for serverless functions'"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
