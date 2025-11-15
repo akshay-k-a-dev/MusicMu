@@ -5,7 +5,7 @@ import { cache, Track } from '../lib/cache';
 const getApiBase = () => {
   // In production, use VITE_API_URL from .env.production
   if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+    return `${import.meta.env.VITE_API_URL}/api`;
   }
   
   // In development, use proxy
