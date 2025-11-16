@@ -44,7 +44,7 @@ interface PlayerStore {
   // Actions
   search: (query: string, limit?: number) => Promise<Track[]>;
   play: (track: Track) => Promise<void>;
-  _playInternal: (track: Track, addToHistory?: boolean) => Promise<void>;
+  _playInternal: (track: Track) => Promise<void>;
   togglePlay: () => void;
   next: () => Promise<void>;
   prev: () => Promise<void>;
@@ -198,7 +198,10 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
           } else if (event.data === YT.PlayerState.BUFFERING) {
             set({ state: 'loading' });
           } else if (event.data === YT.PlayerState.ENDED) {
-            console.log('🎵 Track ended, playing next...');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+            console.log('✅ TRACK COMPLETED:', get().currentTrack?.title);
+            console.log('⏭️  Playing next track from queue...');
+            console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
             get().next();
           }
         },
@@ -289,10 +292,10 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
   },
 
   play: async (track: Track) => {
-    await get()._playInternal(track, true);
+    await get()._playInternal(track);
   },
 
-  _playInternal: async (track: Track, addToHistory: boolean = true) => {
+  _playInternal: async (track: Track) => {
     const { ytPlayer, ytPlayerReady, currentTrack: previousTrack } = get();
 
     if (!ytPlayer || !ytPlayerReady) {
@@ -301,7 +304,18 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       return;
     }
 
-    // Remove track from queue if it exists
+    // 🔄 REVERSE QUEUE LOGIC: Push previous track to reverse queue (history stack)
+    if (previousTrack && previousTrack.videoId !== track.videoId) {
+      await cache.pushToReverseQueue(previousTrack);
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('⬅️  PUSHED TO REVERSE QUEUE:', previousTrack.title);
+      const reverseQueue = await cache.getReverseQueue();
+      console.log('📚 Reverse queue length:', reverseQueue.length);
+      console.log('📋 Reverse queue:', reverseQueue.map(t => t.title).join(' ← '));
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    }
+
+    // Remove track from queue if it exists (normal queue behavior)
     const { queue } = get();
     const trackIndex = queue.findIndex(t => t.videoId === track.videoId);
     if (trackIndex !== -1) {
@@ -336,14 +350,8 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
         startSeconds: 0,
       });
 
-      // Update cache and add to history
+      // Update cache
       await cache.setLastPlayed(track);
-      
-      // Add previous track to history (only if addToHistory is true)
-      if (addToHistory && previousTrack && previousTrack.videoId !== track.videoId) {
-        await cache.addToHistory(previousTrack);
-        console.log('📜 Added to history:', previousTrack.title);
-      }
 
     } catch (error) {
       console.error('Play error:', error);
@@ -375,7 +383,15 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
   },
 
   next: async () => {
-    const { queue } = get();
+    const { queue, currentTrack } = get();
+    
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('⏭️  NEXT BUTTON CLICKED');
+    if (currentTrack) {
+      console.log('⏩ SKIPPING:', currentTrack.title);
+    }
+    console.log('📝 Queue length:', queue.length);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     if (queue.length > 0) {
       await get().play(queue[0]);
@@ -404,36 +420,49 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
   prev: async () => {
     const { progress, currentTrack } = get();
     
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('⏮️  PREVIOUS BUTTON CLICKED');
+    console.log('⏱️  Current progress:', progress.toFixed(1), 'seconds');
+    
     // If more than 3 seconds in, restart current track (first click)
     if (progress > 3) {
+      console.log('🔄 Restarting current track (>3s played)');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       get().seek(0);
       return;
     }
 
-    // Check if there's a previous track in history
-    const history = await cache.getHistory();
-    if (history.length === 0) {
-      // No history available, just restart current track
-      console.log('⏮️ No previous track in history, restarting current');
-      if (currentTrack) {
-        get().seek(0);
-      }
-      return;
-    }
-
-    // Pop the previous track from history
-    const previousTrack = await cache.popFromHistory();
-    if (!previousTrack) {
-      console.log('⏮️ No previous track found, restarting current');
-      if (currentTrack) {
-        get().seek(0);
-      }
-      return;
-    }
-
-    console.log('⏮️ Playing previous track from history:', previousTrack.title);
+    // Check if there's a previous track in reverse queue
+    const reverseQueue = await cache.getReverseQueue();
+    console.log('📚 Reverse queue length:', reverseQueue.length);
+    console.log('📋 Reverse queue:', reverseQueue.map(t => t.title).join(' ← '));
     
-    // Add current track back to the beginning of queue (for "next" navigation)
+    if (reverseQueue.length === 0) {
+      // No history available, just restart current track
+      console.log('❌ No previous track in reverse queue, restarting current');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      if (currentTrack) {
+        get().seek(0);
+      }
+      return;
+    }
+
+    // Pop the previous track from reverse queue (LIFO - stack behavior)
+    const previousTrack = await cache.popFromReverseQueue();
+    if (!previousTrack) {
+      console.log('❌ No previous track found, restarting current');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      if (currentTrack) {
+        get().seek(0);
+      }
+      return;
+    }
+
+    console.log('⏮️  Going back to:', previousTrack.title);
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    
+    // 🔄 REVERSE QUEUE LOGIC: Push current track to FRONT of queue
+    // So when user presses Next, they go back to where they were
     if (currentTrack && currentTrack.videoId !== previousTrack.videoId) {
       const { queue } = get();
       const newQueue = [currentTrack, ...queue];
@@ -442,11 +471,12 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       for (const track of newQueue) {
         await cache.addToQueue(track);
       }
+      console.log('➡️  Pushed current track to front of queue:', currentTrack.title);
     }
     
-    // Play the previous track WITHOUT adding current track to history
-    // The previous track was already in history, we just popped it
-    await get()._playInternal(previousTrack, false);
+    // Play the previous track WITHOUT adding to reverse queue
+    // (it was already popped from reverse queue)
+    await get()._playInternal(previousTrack);
   },
 
   seek: (seconds: number) => {

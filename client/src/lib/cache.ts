@@ -18,9 +18,9 @@ export interface Playlist {
 export interface GuestCache {
   playlists: Playlist[];
   liked: Track[];
-  queue: Track[];
+  queue: Track[]; // Forward queue - songs to play next
+  reverseQueue: Track[]; // Reverse queue (stack) - songs already played
   lastPlayed: Track | null;
-  history: Track[]; // Track history for previous button
   version: number;
 }
 
@@ -38,8 +38,8 @@ const defaultCache: GuestCache = {
   playlists: [],
   liked: [],
   queue: [],
+  reverseQueue: [],
   lastPlayed: null,
-  history: [],
   version: CACHE_VERSION,
 };
 
@@ -192,36 +192,36 @@ export class CacheManager {
     await this.save();
   }
 
-  // History management (for previous button)
-  async addToHistory(track: Track): Promise<void> {
-    // Add track to history, but avoid duplicates in a row
-    const lastInHistory = this.cache!.history[this.cache!.history.length - 1];
-    if (!lastInHistory || lastInHistory.videoId !== track.videoId) {
-      this.cache!.history.push(track);
+  // Reverse Queue management (for previous button - stack/LIFO)
+  async pushToReverseQueue(track: Track): Promise<void> {
+    // Add track to reverse queue (push to stack)
+    const lastInReverseQueue = this.cache!.reverseQueue[this.cache!.reverseQueue.length - 1];
+    if (!lastInReverseQueue || lastInReverseQueue.videoId !== track.videoId) {
+      this.cache!.reverseQueue.push(track);
       
-      // Keep history limited to last 100 tracks to avoid memory issues
-      if (this.cache!.history.length > 100) {
-        this.cache!.history.shift();
+      // Keep reverse queue limited to last 100 tracks to avoid memory issues
+      if (this.cache!.reverseQueue.length > 100) {
+        this.cache!.reverseQueue.shift();
       }
       
       await this.save();
     }
   }
 
-  async getHistory(): Promise<Track[]> {
-    return [...this.cache!.history];
+  async getReverseQueue(): Promise<Track[]> {
+    return [...this.cache!.reverseQueue];
   }
 
-  async popFromHistory(): Promise<Track | null> {
-    const track = this.cache!.history.pop();
+  async popFromReverseQueue(): Promise<Track | null> {
+    const track = this.cache!.reverseQueue.pop();
     if (track) {
       await this.save();
     }
     return track || null;
   }
 
-  async clearHistory(): Promise<void> {
-    this.cache!.history = [];
+  async clearReverseQueue(): Promise<void> {
+    this.cache!.reverseQueue = [];
     await this.save();
   }
 
