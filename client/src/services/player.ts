@@ -413,30 +413,43 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       return;
     }
 
-    // Second click onwards - play previous track from history
-    const previousTrack = await cache.popFromHistory();
-    if (previousTrack) {
-      console.log('⏮️ Playing previous track from history:', previousTrack.title);
-      
-      // Add current track back to the beginning of queue
-      if (currentTrack && currentTrack.videoId !== previousTrack.videoId) {
-        const { queue } = get();
-        const newQueue = [currentTrack, ...queue];
-        set({ queue: newQueue });
-        await cache.clearQueue();
-        for (const track of newQueue) {
-          await cache.addToQueue(track);
-        }
-      }
-      
-      // Play the previous track without adding to history
-      await get()._playInternal(previousTrack, false);
-    } else {
+    // Check if there's a previous track in history
+    const history = await cache.getHistory();
+    if (history.length === 0) {
       // No history available, just restart current track
+      console.log('⏮️ No previous track in history, restarting current');
       if (currentTrack) {
         get().seek(0);
       }
+      return;
     }
+
+    // Pop the previous track from history
+    const previousTrack = await cache.popFromHistory();
+    if (!previousTrack) {
+      console.log('⏮️ No previous track found, restarting current');
+      if (currentTrack) {
+        get().seek(0);
+      }
+      return;
+    }
+
+    console.log('⏮️ Playing previous track from history:', previousTrack.title);
+    
+    // Add current track back to the beginning of queue (for "next" navigation)
+    if (currentTrack && currentTrack.videoId !== previousTrack.videoId) {
+      const { queue } = get();
+      const newQueue = [currentTrack, ...queue];
+      set({ queue: newQueue });
+      await cache.clearQueue();
+      for (const track of newQueue) {
+        await cache.addToQueue(track);
+      }
+    }
+    
+    // Play the previous track WITHOUT adding current track to history
+    // The previous track was already in history, we just popped it
+    await get()._playInternal(previousTrack, false);
   },
 
   seek: (seconds: number) => {
