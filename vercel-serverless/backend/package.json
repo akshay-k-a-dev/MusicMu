@@ -5,16 +5,28 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:push": "prisma db push",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@fastify/cors": "^8.4.0",
+    "@fastify/jwt": "^7.2.4",
+    "@prisma/client": "^5.22.0",
+    "@prisma/extension-accelerate": "^1.2.1",
+    "bcryptjs": "^2.4.3",
     "dotenv": "^16.6.1",
     "fastify": "^4.24.0",
-    "youtubei.js": "^10.5.0"
+    "youtubei.js": "^10.5.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.0.0",
+    "prisma": "^5.22.0",
     "tsx": "^4.7.0",
     "typescript": "^5.3.0"
   },

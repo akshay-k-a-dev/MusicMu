@@ -1,23 +1,124 @@
 import { motion } from 'framer-motion';
-import { Play, Pause, Music, Loader2 } from 'lucide-react';
+import { Play, Pause, Music, Loader2, RefreshCw } from 'lucide-react';
 import { usePlayer } from '../services/player';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../lib/authStore';
+import { getRecommendations, getGuestRecommendations, Recommendations } from '../services/recommendations';
+import RecommendationSection from '../components/RecommendationSection';
+import ArtistCard from '../components/ArtistCard';
 
 export function HomePage() {
   const { currentTrack, state, togglePlay } = usePlayer();
+  const { isAuthenticated } = useAuth();
+  const [recommendations, setRecommendations] = useState<Recommendations | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadRecommendations = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      if (isAuthenticated) {
+        const data = await getRecommendations();
+        setRecommendations(data);
+      } else {
+        const data = await getGuestRecommendations();
+        setRecommendations(data);
+      }
+    } catch (err) {
+      console.error('Failed to load recommendations:', err);
+      setError('Failed to load recommendations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRecommendations();
+  }, [isAuthenticated]);
 
   if (!currentTrack) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Music size={80} className="text-purple-700 mb-6" />
-        <h2 className="text-3xl font-bold text-gray-300 mb-4">
-          Welcome to MusicMu
-        </h2>
-        <p className="text-gray-400 text-center max-w-md mb-2">
-          Ad-free music streaming with unlimited skips
-        </p>
-        <p className="text-sm text-gray-500 text-center max-w-md">
-          Search for songs to start listening — no interruptions, no forced content
-        </p>
+      <div className="space-y-8">
+        <div className="flex flex-col items-center justify-center min-h-[40vh]">
+          <Music size={80} className="text-purple-700 mb-6" />
+          <h2 className="text-3xl font-bold text-gray-300 mb-4">
+            Welcome to MusicMu
+          </h2>
+          <p className="text-gray-400 text-center max-w-md mb-2">
+            Ad-free music streaming with unlimited skips
+          </p>
+          <p className="text-sm text-gray-500 text-center max-w-md">
+            Search for songs to start listening — no interruptions, no forced content
+          </p>
+        </div>
+
+        {/* Show recommendations even when no track is playing */}
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 size={32} className="text-purple-500 animate-spin" />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button
+              onClick={loadRecommendations}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && recommendations && (
+          <div className="space-y-8">
+            {/* Recently Played */}
+            {recommendations.recentlyPlayed.length > 0 && (
+              <RecommendationSection
+                title="Recently Played"
+                description="Pick up where you left off"
+                tracks={recommendations.recentlyPlayed}
+              />
+            )}
+
+            {/* Most Played */}
+            {recommendations.mostPlayed.length > 0 && (
+              <RecommendationSection
+                title="Your Favorites"
+                description="Tracks you can't get enough of"
+                tracks={recommendations.mostPlayed}
+              />
+            )}
+
+            {/* Top Artists */}
+            {recommendations.topArtists.length > 0 && (
+              <div className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white">Top Artists</h2>
+                    <p className="text-sm text-gray-400 mt-1">Artists you love most</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {recommendations.topArtists.map((artist, index) => (
+                    <ArtistCard key={artist.name} artist={artist} index={index} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recommendations.recentlyPlayed && recommendations.recentlyPlayed.length === 0 && 
+             recommendations.mostPlayed && recommendations.mostPlayed.length === 0 && 
+             recommendations.topArtists && recommendations.topArtists.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <p>Start listening to build your recommendations!</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -87,6 +188,87 @@ export function HomePage() {
           <span className="font-semibold text-white">Format: </span>
           Audio-Only Stream
         </div>
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-gray-800 my-8"></div>
+
+      {/* Recommendations Section */}
+      <div>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-white">For You</h2>
+          <button
+            onClick={loadRecommendations}
+            disabled={loading}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 size={32} className="text-purple-500 animate-spin" />
+          </div>
+        )}
+
+        {error && (
+          <div className="text-center py-8">
+            <p className="text-red-400 mb-4">{error}</p>
+            <button
+              onClick={loadRecommendations}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && recommendations && (
+          <div className="space-y-8">
+            {/* Recently Played */}
+            {recommendations.recentlyPlayed.length > 0 && (
+              <RecommendationSection
+                title="Recently Played"
+                description="Pick up where you left off"
+                tracks={recommendations.recentlyPlayed}
+              />
+            )}
+
+            {/* Most Played */}
+            {recommendations.mostPlayed.length > 0 && (
+              <RecommendationSection
+                title="Your Favorites"
+                description="Tracks you can't get enough of"
+                tracks={recommendations.mostPlayed}
+              />
+            )}
+
+            {/* Top Artists */}
+            {recommendations.topArtists.length > 0 && (
+              <div className="mb-8">
+                <div className="mb-4">
+                  <h3 className="text-xl font-bold text-white">Top Artists</h3>
+                  <p className="text-sm text-gray-400 mt-1">Artists you love most</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                  {recommendations.topArtists.map((artist, index) => (
+                    <ArtistCard key={artist.name} artist={artist} index={index} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {recommendations.recentlyPlayed.length === 0 && 
+             recommendations.mostPlayed.length === 0 && 
+             recommendations.topArtists.length === 0 && (
+              <div className="text-center py-8 text-gray-400">
+                <p>Keep listening to build personalized recommendations!</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

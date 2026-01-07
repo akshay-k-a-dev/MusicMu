@@ -209,7 +209,7 @@ export class CacheManager {
   }
 
   async getReverseQueue(): Promise<Track[]> {
-    return [...this.cache!.reverseQueue];
+    return [...this.cache!.reverseQueue] as Track[];
   }
 
   async popFromReverseQueue(): Promise<Track | null> {

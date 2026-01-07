@@ -1,7 +1,13 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import jwt from '@fastify/jwt';
 import { config } from 'dotenv';
 import { search, getMetadata } from './lib/youtube.js';
+import authRoutes from './routes/auth.js';
+import likesRoutes from './routes/likes.js';
+import playlistsRoutes from './routes/playlists.js';
+import historyRoutes from './routes/history.js';
+import recommendationsRoutes from './routes/recommendations.js';
 
 // Load environment variables
 config();
@@ -19,8 +25,29 @@ const app = Fastify({
 // Register CORS
 await app.register(cors, {
   origin: process.env.CORS_ORIGIN || '*',
-  methods: ['GET', 'POST', 'OPTIONS']
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 });
+
+// Register JWT
+await app.register(jwt, {
+  secret: process.env.JWT_SECRET || 'your-secret-key-change-this-in-production'
+});
+
+// Add authentication decorator
+app.decorate('authenticate', async function(request, reply) {
+  try {
+    await request.jwtVerify();
+  } catch (err) {
+    reply.send(err);
+  }
+});
+
+// Register authentication routes
+await app.register(authRoutes, { prefix: '/api/auth' });
+await app.register(likesRoutes, { prefix: '/api/likes' });
+await app.register(playlistsRoutes, { prefix: '/api/playlists' });
+await app.register(historyRoutes, { prefix: '/api/history' });
+await app.register(recommendationsRoutes, { prefix: '/api/recommendations' });
 
 // Root health endpoint (homepage)
 app.get('/', async (request, reply) => {
@@ -36,7 +63,15 @@ app.get('/', async (request, reply) => {
       guest: '/api/guest',
       track: '/api/track/:id',
       stream: '/api/track/:id/stream',
-      full: '/api/track/:id/full'
+      full: '/api/track/:id/full',
+      auth: {
+        register: '/api/auth/register',
+        login: '/api/auth/login',
+        me: '/api/auth/me'
+      },
+      likes: '/api/likes',
+      playlists: '/api/playlists',
+      history: '/api/history'
     }
   };
 });

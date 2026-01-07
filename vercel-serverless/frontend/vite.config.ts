@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       host: '0.0.0.0',
-      port: 4173,
+      port: 5171,
       strictPort: false,
       watch: {
         ignored: ['**/node_modules/**', '**/.git/**'],

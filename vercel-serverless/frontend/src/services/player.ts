@@ -36,6 +36,7 @@ interface PlayerStore {
   progress: number;
   duration: number;
   error: string | null;
+  isPlayerVisible: boolean;
   
   // YouTube IFrame player instance
   ytPlayer: any | null;
@@ -69,6 +70,7 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
   progress: 0,
   duration: 0,
   error: null,
+  isPlayerVisible: false,
   ytPlayer: null,
   ytPlayerReady: false,
 
@@ -76,9 +78,11 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
     await cache.init();
     const cached = cache.getCache();
     
+    // Restore queue and last played song, but don't auto-play
     set({ 
       queue: cached.queue,
       currentTrack: cached.lastPlayed,
+      state: 'idle', // Keep it idle, don't auto-play
     });
 
     // Initialize YouTube IFrame API
@@ -315,6 +319,32 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       console.log('📚 Reverse queue length:', reverseQueue.length);
       console.log('📋 Reverse queue:', reverseQueue.map(t => t.title).join(' ← '));
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // 📝 AUTO-RECORD PLAY HISTORY FOR LOGGED-IN USERS
+      const { useAuth } = await import('../lib/authStore');
+      const token = useAuth.getState().token;
+      if (token) {
+        try {
+          await fetch(`${API_BASE}/api/history`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              trackId: previousTrack.videoId,
+              title: previousTrack.title,
+              artist: previousTrack.artist,
+              thumbnail: previousTrack.thumbnail,
+              duration: previousTrack.duration
+            })
+          });
+          console.log('✅ Play history recorded for logged-in user');
+        } catch (error) {
+          console.error('Failed to record play history:', error);
+          // Don't block playback if recording fails
+        }
+      }
     }
 
     // Remove track from queue if it exists (normal queue behavior)
@@ -333,7 +363,8 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
       currentTrack: track, 
       error: null,
       progress: 0,
-      duration: track.duration || 0
+      duration: track.duration || 0,
+      isPlayerVisible: true // Show player when user plays something
     });
 
     console.log('🎵 Playing track:', track.title, 'by', track.artist);
@@ -520,11 +551,57 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
   },
 
   like: async (track: Track) => {
+    // Save to local cache first
     await cache.likeSong(track);
+    
+    // Sync to backend if authenticated
+    const { useAuth } = await import('../lib/authStore');
+    const token = useAuth.getState().token;
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/api/likes`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            trackId: track.videoId,
+            title: track.title,
+            artist: track.artist,
+            thumbnail: track.thumbnail,
+            duration: track.duration
+          })
+        });
+        console.log('✅ Liked track synced to backend');
+      } catch (error) {
+        console.error('Failed to sync like to backend:', error);
+        // Keep local like even if backend fails
+      }
+    }
   },
 
   unlike: async (videoId: string) => {
+    // Remove from local cache first
     await cache.unlikeSong(videoId);
+    
+    // Sync to backend if authenticated
+    const { useAuth } = await import('../lib/authStore');
+    const token = useAuth.getState().token;
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/api/likes/${videoId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        console.log('✅ Unlike synced to backend');
+      } catch (error) {
+        console.error('Failed to sync unlike to backend:', error);
+        // Keep local unlike even if backend fails
+      }
+    }
   },
 
   isLiked: (videoId: string) => {

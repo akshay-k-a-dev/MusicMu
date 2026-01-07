@@ -1,18 +1,32 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { usePlayer } from './services/player';
+import { useAuth } from './lib/authStore';
 import { HomePage } from './pages/HomePage';
 import { SearchPage } from './pages/SearchPage';
 import { LikedPage } from './pages/LikedPage';
 import { QueuePage } from './pages/QueuePage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ProfilePage from './pages/ProfilePage';
 import Sidebar from './components/Sidebar';
 import PlayerBar from './components/PlayerBar';
 import MobileNav from './components/MobileNav';
 
 function AppContent() {
+  const isPlayerVisible = usePlayer((state) => state.isPlayerVisible);
+  
   useEffect(() => {
-    // Initialize player once on mount
-    usePlayer.getState().init();
+    // Initialize everything in sequence
+    const initApp = async () => {
+      // Initialize player (which initializes cache)
+      await usePlayer.getState().init();
+      
+      // Then initialize auth from IndexedDB
+      await useAuth.getState().initAuth().catch(console.error);
+    };
+    
+    initApp();
   }, []); // Empty dependency array - only run once
 
   return (
@@ -24,21 +38,29 @@ function AppContent() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto bg-gradient-to-b from-gray-900 to-black p-4 md:p-8 pb-32 md:pb-24">
+        <div className={`flex-1 overflow-y-auto bg-gradient-to-b from-gray-900 to-black p-4 md:p-8 ${isPlayerVisible ? 'pb-32 md:pb-24' : 'pb-4'}`}>
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/search" element={<SearchPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/liked" element={<LikedPage />} />
             <Route path="/queue" element={<QueuePage />} />
           </Routes>
         </div>
       </div>
 
-      {/* Player Bar */}
-      <PlayerBar />
-      
-      {/* Mobile Navigation - Bottom */}
-      <MobileNav />
+      {/* Conditionally render Player Bar and Mobile Nav only when player is visible */}
+      {isPlayerVisible && (
+        <>
+          {/* Player Bar */}
+          <PlayerBar />
+          
+          {/* Mobile Navigation - Bottom */}
+          <MobileNav />
+        </>
+      )}
     </div>
   );
 }

@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  name      String?
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  likedTracks      LikedTrack[]
+  playlists        Playlist[]
+  playHistory      PlayHistory[]
+  recommendations  Recommendation[]
+  
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+model LikedTrack {
+  id          String   @id @default(cuid())
+  userId      String
+  trackId     String
+  title       String
+  artist      String
+  thumbnail   String?
+  duration    Int?
+  likedAt     DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, trackId])
+  @@index([userId])
+  @@index([trackId])
+  @@map("liked_tracks")
+}
+
+model Playlist {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  thumbnail   String?
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks      PlaylistTrack[]
+  
+  @@index([userId])
+  @@map("playlists")
+}
+
+model PlaylistTrack {
+  id          String   @id @default(cuid())
+  playlistId  String
+  trackId     String
+  title       String
+  artist      String
+  thumbnail   String?
+  duration    Int?
+  position    Int
+  addedAt     DateTime @default(now())
+  
+  playlist    Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  
+  @@unique([playlistId, trackId])
+  @@index([playlistId])
+  @@map("playlist_tracks")
+}
+
+model PlayHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  trackId     String
+  title       String
+  artist      String
+  thumbnail   String?
+  duration    Int?
+  playedAt    DateTime @default(now())
+  
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([playedAt])
+  @@index([trackId])
+  @@map("play_history")
+}
+
+model Recommendation {
+  id            String    @id @default(cuid())
+  userId        String
+  trackId       String
+  title         String
+  artist        String
+  thumbnail     String?
+  duration      Int?
+  source        String    // "play", "search", "like"
+  score         Float     @default(1.0) // Recommendation weight
+  playCount     Int       @default(0) // Number of times played
+  lastPlayedAt  DateTime? // Last time this track was played
+  isLiked       Boolean   @default(false) // Is this track liked?
+  likedAt       DateTime? // When was this track liked?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, trackId])
+  @@index([userId])
+  @@index([score])
+  @@index([playCount])
+  @@index([lastPlayedAt])
+  @@index([createdAt])
+  @@map("recommendations")
+}
