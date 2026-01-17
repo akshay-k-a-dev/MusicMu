@@ -6,94 +6,99 @@
 > ⚠️ **Not affiliated with or endorsed by Google LLC or YouTube.**  
 > MusicMu streams content using official YouTube embedding policies and does not store or redistribute copyrighted material.
 
+## 🌟 Quick Links
+
+- **Live Demo**: https://music-mu-p6h9.vercel.app/
+- **Backend API**: https://music-mu-lovat.vercel.app/api
+- **Full Documentation**: See [PROJECT_DOCUMENTATION.md](./PROJECT_DOCUMENTATION.md) for detailed architecture, features, and database schema
+
 ---
 
 ## ✨ What Makes MusicMu Special?
 
 ### 🎧 Core Playback Features
-- 🚫 **Ad-Free Streaming** — Enjoy uninterrupted audio
+- 🚫 **Ad-Free Streaming** — Enjoy uninterrupted audio streaming
 - ⏭️ **Unlimited Skips** — Skip freely without restrictions
 - 🔊 **Audio-Only Mode** — Save bandwidth, focus on sound
-- 🎛️ **Full Playback Control** — Seek, play, pause, queue — without limitations
-- 🔁 **Smart Queue** — Flexible queue with intuitive history navigation
-- 👤 **Guest Mode Support** — No login required, your data stays on your device
+- 🎛️ **Full Playback Control** — Seek, play, pause, queue management without limitations
+- 🔁 **Smart Queue System** — Dual-queue architecture (forward & history-based)
+- 👤 **Dual Mode Support** — Guest mode (localStorage) or authenticated (database)
+- 🎵 **Collaborative Blends** — Create shared playlists with friends
 
-### 🏗️ Modern UI/UX
-- Stunning **glassmorphic design** powered by Tailwind CSS
-- Delightful animations via Framer Motion
-- Responsive, mobile-first layout
-- Pages include:
-  - **Home** – Main player
-  - **Search** – Find any track
-  - **Liked Songs**
-  - **Queue Management**
+### 🏗️ Modern Architecture
+- **Frontend**: React 18 + Vite + Tailwind CSS with glassmorphic design
+- **Backend**: Fastify serverless on Vercel with PostgreSQL (Prisma)
+- **Search**: Innertube (YouTube metadata)
+- **Playback**: YouTube IFrame API (official, no copyright violations)
+- **Storage**: IndexedDB (guest) + PostgreSQL (authenticated)
+
+### 📱 Pages & Features
+- **Home** – Personalized recommendations with artist insights
+- **Search** – YouTube-powered track discovery with load-more
+- **Liked Songs** – Personal liked tracks collection
+- **Queue** – Visual queue management with reverse history
+- **Playlists** – Create and manage custom playlists
+- **Blends** – Collaborative playlists with friends (invite-based)
+- **Profile** – User settings and stats
+- **Mobile Navigation** – Full responsive mobile-first design
 
 ---
 
 ## 🚀 Quick Deploy (Serverless)
 
-> 🛠 Deployed and hosted on Vercel using serverless functions.
+**Deployed on Vercel:**
+```
+Frontend:  https://music-mu-p6h9.vercel.app/
+Backend:   https://music-mu-lovat.vercel.app/api
+```
 
-**Frontend:**  
-🌐 https://music-mu-p6h9.vercel.app/  
-React + Vite static site deployed on Vercel CDN
-
-**Backend:**
-🛠️ Fastify (Node.js) server running as Vercel Serverless Functions  
-API Base: `https://music-mu-lovat.vercel.app/api`
-
-**Directory:** `./vercel-serverless`
+**Directory Structure:**
+```
+./vercel-serverless/
+├── backend/              # Fastify serverless API
+│   ├── api/              # Vercel serverless endpoints
+│   ├── src/
+│   │   ├── routes/       # 7 route modules
+│   │   ├── lib/          # YouTube, Auth, Validation
+│   │   └── index.ts
+│   └── prisma/           # Database schema
+└── frontend/             # React Vite client
+    ├── src/
+    │   ├── pages/        # 11 route pages
+    │   ├── components/   # UI components
+    │   ├── services/     # API & playback logic
+    │   └── lib/          # State & cache
+    └── public/           # PWA assets
+```
 
 ---
 
-## 🧠 How It Works
+## 🧠 How It Works (High Level)
 
-### 🔍 Search & Metadata
-- Powered by `Innertube` — an unofficial YouTube Data library (used for metadata and stream IDs)
+### Data Flow Architecture
+```
+┌─────────────────────────────────────────────────────────┐
+│  GUEST MODE (No Login)                                  │
+│  IndexedDB ↔ Frontend Store (Zustand) ↔ YouTube IFrame │
+└─────────────────────────────────────────────────────────┘
 
-### 📡 Stream Source
-- All streaming uses **YouTube IFrame Player API**
-  - No external audio URLs needed
-  - Maximizes compatibility with YouTube ToS
-  - Requires minimal backend processing
-
-### 💾 Local Guest Storage
-- Stored via IndexedDB using `localforage`
-- Retains:
+┌──────────────────────────────────────────────────────────┐
+│  AUTHENTICATED MODE (With Login)                         │
+│  ┌───────────────┐         ┌─────────────────┐          │
+│  │  Frontend     │ ←JWT→  │  Fastify API    │          │
+│  │  Zustand      │        │  PostgreSQL     │          │
+│  │  IndexedDB    │ ←──→   │  Prisma ORM     │          │
+│  └───────────────┘        └─────────────────┘          │
+│         ↓                                                │
+│  YouTube IFrame Player API (streaming only)             │
+└──────────────────────────────────────────────────────────┘
 ```
 
-{
-playlists,
-liked songs,
-recent queue,
-last played track,
-version
-}
-
+### Search & Metadata Pipeline
 ```
-- Auto-clears after 30 days without a version match
-
----
-
-## 📁 Project Structure Overview
-
+Search Query → Innertube.search() → Filter (1-10 min duration)
+            → YouTube Video ID → YouTube IFrame URL
 ```
-
-musicmu/
-├── vercel-serverless/       # Full serverless implementation for Vercel
-│   ├── backend/             # API functions (Fastify)
-│   │   ├── api/             # Serverless endpoints
-│   │   ├── lib/             # YouTube + playback helpers
-│   │   └── package.json
-│   ├── frontend/            # React Vite app (client)
-│   │   ├── src/             # Same as full-stack frontend
-│   │   ├── public/          # PWA manifest, icons
-│   │   └── package.json
-│   ├── LICENSE              # GNU GPLv3 License
-│   └── README.md
-└── (legacy full-stack directories removed)
-
-````
 
 ---
 
@@ -101,12 +106,60 @@ musicmu/
 
 > Base URL: `https://music-mu-lovat.vercel.app/api`
 
-| Endpoint                         | Description             |
-|----------------------------------|-------------------------|
-| `GET /search?q=query`            | Search tracks           |
-| `GET /track/:id`                 | Track metadata          |
-| `GET /track/:id/stream`          | IFrame embed streaming  |
-| `GET /guest/health`              | Guest mode health check |
+### Public Endpoints
+```
+GET  /health                    Health check
+GET  /search?q=query&limit=10   Search tracks (YouTube metadata)
+GET  /track/:id                 Get track metadata
+GET  /track/:id/stream          Get IFrame embed URL
+GET  /guest                     Create guest session
+```
+
+### Authentication Routes `/auth`
+```
+POST /auth/register             Register new user
+POST /auth/login                Login user (returns JWT)
+GET  /auth/me                   Get current user profile
+```
+
+### Likes Routes `/likes` (Protected)
+```
+GET  /likes                     Get all liked tracks
+POST /likes                     Like a track
+DELETE /likes/:trackId          Unlike a track
+GET  /likes/:trackId            Check if track is liked
+```
+
+### Playlists Routes `/playlists` (Protected)
+```
+GET  /playlists                 Get user playlists
+POST /playlists                 Create new playlist
+GET  /playlists/:id             Get playlist details + tracks
+POST /playlists/:id/tracks      Add track to playlist
+DELETE /playlists/:id/tracks/:trackId   Remove track
+GET  /playlists/discover/popular   Get popular tracks cache
+```
+
+### History Routes `/history` (Protected)
+```
+GET  /history?limit=50&offset=0     Get play history
+POST /history                       Record play
+```
+
+### Recommendations Routes `/recommendations` (Protected)
+```
+GET  /recommendations           Get personalized recommendations
+```
+
+### Blends Routes `/blends` (Protected)
+```
+POST /blends/invite             Send blend invite
+GET  /blends/invites            Get pending invites
+POST /blends/invites/:id/accept Accept invite
+POST /blends/invites/:id/reject Reject invite
+GET  /blends                    Get all blends
+GET  /blends/:id                Get blend details + tracks
+```
 
 ---
 
