@@ -11,57 +11,31 @@ interface LyricsPanelProps {
   trackId?: string;
 }
 
-// Memoized individual lyric line - Spotify-style for desktop, original for mobile
+// Individual lyric line component
 const LyricLine = memo(({ 
   line, 
   isCurrent, 
   isPast,
-  isDesktop,
   distanceFromCurrent,
-  lineRef,
+  onRef,
 }: { 
   line: SyncedLine; 
   isCurrent: boolean; 
   isPast: boolean;
-  isDesktop: boolean;
   distanceFromCurrent: number;
-  lineRef?: React.RefObject<HTMLDivElement>;
+  onRef?: (el: HTMLDivElement | null) => void;
 }) => {
-  // Desktop: Spotify-style with indentation and progressive fade
-  if (isDesktop) {
-    const opacity = isCurrent ? 1 : Math.max(0.3, 1 - Math.abs(distanceFromCurrent) * 0.15);
-    const indent = isCurrent ? 0 : 32;
-    
-    return (
-      <div
-        ref={lineRef}
-        className={`text-center py-3 transition-all duration-300 ease-out ${
-          isCurrent
-            ? 'text-white text-2xl md:text-3xl font-bold'
-            : 'text-white/90 text-base md:text-lg font-normal'
-        }`}
-        style={{
-          opacity,
-          paddingLeft: `${indent}px`,
-          paddingRight: `${indent}px`,
-        }}
-      >
-        {line.text || '♪'}
-      </div>
-    );
-  }
+  const opacity = isCurrent ? 1 : Math.max(0.25, 1 - Math.abs(distanceFromCurrent) * 0.2);
   
-  // Mobile: Centered current line with better visibility
   return (
     <div
-      ref={lineRef}
-      className={`text-center py-3 transition-all duration-300 ease-out ${
+      ref={onRef}
+      className={`text-center py-4 px-4 transition-all duration-500 ease-out ${
         isCurrent
-          ? 'text-white text-xl font-bold'
-          : isPast
-          ? 'text-white/40 text-base'
-          : 'text-white/60 text-base'
+          ? 'text-white text-xl sm:text-2xl md:text-3xl font-bold scale-100'
+          : 'text-white font-normal text-base sm:text-lg md:text-xl'
       }`}
+      style={{ opacity }}
     >
       {line.text || '♪'}
     </div>
@@ -74,13 +48,11 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'synced' | 'plain'>('synced');
   const [noLyricsMessage] = useState(getRandomNoLyricsMessage());
-  const [currentLineIndex, setCurrentLineIndex] = useState(-1);
+  const [currentLineIndex, setCurrentLineIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
-  const lyricsContentRef = useRef<HTMLDivElement>(null);
-  const currentLineRef = useRef<HTMLDivElement>(null);
-  const [containerHeight, setContainerHeight] = useState(0);
+  const currentLineRef = useRef<HTMLDivElement | null>(null);
   const [isAutoScrollEnabled, setIsAutoScrollEnabled] = useState(true);
-  const [isDesktop, setIsDesktop] = useState(window.innerWidth >= 768);
+  const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Zustand store for caching
   const { getCached, setLyrics, setCurrentTrack } = useLyricsStore();
@@ -96,33 +68,7 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
   const lyrics = cachedEntry?.lyrics ?? null;
   const syncedLines = cachedEntry?.syncedLines ?? [];
 
-  // Detect desktop vs mobile on resize
-  useEffect(() => {
-    const handleResize = () => {
-      setIsDesktop(window.innerWidth >= 768);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Measure container height for centering calculation
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    
-    const updateHeight = () => {
-      setContainerHeight(container.clientHeight);
-    };
-    
-    updateHeight();
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(container);
-    
-    return () => observer.disconnect();
-  }, []);
-
-  // Fetch lyrics when track changes (only if not cached)
+  // Fetch lyrics when track changes (only if not cached with actual lyrics)
   useEffect(() => {
     let mounted = true;
 
@@ -131,10 +77,10 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
         return;
       }
 
-      // Check cache first
+      // Check cache first - but only use if it has actual lyrics
       const cached = getCached(cacheKey);
-      if (cached) {
-        console.log('📝 Lyrics: Using cached lyrics for', trackTitle);
+      if (cached && cached.lyrics && (cached.lyrics.syncedLyrics || cached.lyrics.plainLyrics)) {
+        console.log('📝 Using cached lyrics for:', trackTitle);
         setCurrentTrack(cacheKey);
         if (cached.syncedLines.length > 0) {
           setViewMode('synced');
@@ -145,14 +91,28 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
         return;
       }
 
-      console.log('📝 Lyrics: Fetching for', trackTitle, 'by', artistName);
-      setLoading(true);
-      setCurrentLineIndex(-1);
+      // If cached but no lyrics found, clear it and try again
+      if (cached && !cached.lyrics) {
+        console.log('📝 Cached entry has no lyrics, re-fetching:', trackTitle);
+      }
 
+      setLoading(true);
+      setCurrentLineIndex(0);
+
+      console.log('📝 Fetching lyrics for:', trackTitle, 'by', artistName);
       const result = await getLyrics(trackTitle, artistName, duration);
       
       if (mounted) {
-        setLyrics(cacheKey, result);
+        // Only cache if we got a result with lyrics
+        if (result && (result.syncedLyrics || result.plainLyrics)) {
+          console.log('📝 Found lyrics:', result.syncedLyrics ? 'synced' : 'plain only');
+          setLyrics(cacheKey, result);
+        } else {
+          console.log('📝 No lyrics found for:', trackTitle);
+          // Don't cache null results - allow retry next time
+          setLyrics(cacheKey, null);
+        }
+        
         setCurrentTrack(cacheKey);
         
         if (result?.syncedLyrics) {
@@ -171,47 +131,60 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
     };
   }, [cacheKey, trackTitle, artistName, duration, getCached, setLyrics, setCurrentTrack]);
 
-  // Update current line based on playback time (memoized for performance)
-  const updateCurrentLine = useCallback(() => {
+  // Update current line based on playback time
+  useEffect(() => {
     if (syncedLines.length > 0 && viewMode === 'synced') {
       const index = getCurrentLineIndex(syncedLines, currentTime);
-      setCurrentLineIndex(index);
+      setCurrentLineIndex(index >= 0 ? index : 0);
     }
   }, [syncedLines, currentTime, viewMode]);
 
-  useEffect(() => {
-    updateCurrentLine();
-  }, [updateCurrentLine]);
-
-  // Handle user interaction - PERMANENTLY disable auto-scroll
-  const handleUserInteraction = useCallback(() => {
-    if (!isAutoScrollEnabled) return; // Already disabled
+  // Handle user scroll - temporarily disable auto-scroll
+  const handleUserScroll = useCallback(() => {
+    // Clear any existing timeout
+    if (userScrollTimeoutRef.current) {
+      clearTimeout(userScrollTimeoutRef.current);
+    }
+    
+    // Disable auto-scroll
     setIsAutoScrollEnabled(false);
-  }, [isAutoScrollEnabled]);
+    
+    // Re-enable after 3 seconds of no scrolling
+    userScrollTimeoutRef.current = setTimeout(() => {
+      setIsAutoScrollEnabled(true);
+    }, 3000);
+  }, []);
 
-  // Auto-scroll to center current line (both mobile and desktop)
+  // Cleanup timeout on unmount
   useEffect(() => {
-    if (!isAutoScrollEnabled || currentLineIndex < 0 || !containerRef.current || !currentLineRef.current) return;
+    return () => {
+      if (userScrollTimeoutRef.current) {
+        clearTimeout(userScrollTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Auto-scroll to center current line
+  useEffect(() => {
+    if (!isAutoScrollEnabled || !currentLineRef.current || !containerRef.current) return;
     
     const container = containerRef.current;
-    const currentLine = currentLineRef.current;
+    const line = currentLineRef.current;
     
-    // Get the actual position of the current line element
-    const lineRect = currentLine.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    
-    // Calculate where to scroll to center the current line
-    const lineCenter = currentLine.offsetTop + (lineRect.height / 2);
-    const targetScrollTop = lineCenter - (containerRect.height / 2);
+    // Calculate scroll position to center the current line
+    const containerHeight = container.clientHeight;
+    const lineTop = line.offsetTop;
+    const lineHeight = line.offsetHeight;
+    const scrollTarget = lineTop - (containerHeight / 2) + (lineHeight / 2);
     
     container.scrollTo({
-      top: Math.max(0, targetScrollTop),
+      top: Math.max(0, scrollTarget),
       behavior: 'smooth'
     });
-  }, [isAutoScrollEnabled, currentLineIndex]);
+  }, [currentLineIndex, isAutoScrollEnabled]);
 
   // Loading state
-  if (loading || (!cachedEntry && duration <= 0)) {
+  if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-20 text-white/60">
         <Loader2 size={32} className="animate-spin mb-4" />
@@ -233,8 +206,8 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
     );
   }
 
-  // Has plain lyrics but no synced
-  if (!lyrics.syncedLyrics && lyrics.plainLyrics) {
+  // Has plain lyrics but no synced (or synced couldn't be parsed)
+  if ((!lyrics.syncedLyrics || syncedLines.length === 0) && lyrics.plainLyrics) {
     return (
       <div className="h-full overflow-y-auto px-4 sm:px-6 py-6">
         <div className="max-w-2xl mx-auto">
@@ -250,10 +223,10 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
     );
   }
 
-  // Has synced lyrics - Different behavior for desktop vs mobile
+  // Has synced lyrics
   if (lyrics.syncedLyrics && syncedLines.length > 0) {
     return (
-      <div className="h-full flex flex-col overflow-hidden">
+      <div className="h-full flex flex-col overflow-hidden bg-black/50">
         {/* View Mode Toggle */}
         {lyrics.plainLyrics && (
           <div className="flex items-center justify-center gap-2 py-3 border-b border-white/10 flex-shrink-0">
@@ -282,55 +255,55 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
           </div>
         )}
 
-        {/* Lyrics Content - Scrollable container with centered current line */}
-        <div 
-          ref={containerRef}
-          className="flex-1 relative overflow-y-auto overflow-x-hidden px-4 overscroll-contain"
-          onWheel={handleUserInteraction}
-          onTouchMove={handleUserInteraction}
-          onScroll={handleUserInteraction}
-          style={{ 
-            WebkitOverflowScrolling: 'touch' as any,
-          }}
-        >
-          {viewMode === 'synced' ? (
-            <>
-              {/* Gradient overlays - absolute positioned */}
-              <div className="sticky top-0 left-0 right-0 h-20 bg-gradient-to-b from-black via-black/70 to-transparent z-10 pointer-events-none -mb-20" />
-              
-              {/* Lyrics container with padding for centering */}
-              <div 
-                ref={lyricsContentRef}
-                className="max-w-2xl mx-auto"
-                style={{ 
-                  paddingTop: `${containerHeight / 2}px`,
-                  paddingBottom: `${containerHeight / 2}px`,
-                }}
-              >
-                {syncedLines.map((line, index) => (
-                  <LyricLine
-                    key={index}
-                    line={line}
-                    isCurrent={index === currentLineIndex}
-                    isPast={index < currentLineIndex}
-                    isDesktop={isDesktop}
-                    distanceFromCurrent={index - currentLineIndex}
-                    lineRef={index === currentLineIndex ? currentLineRef : undefined}
-                  />
-                ))}
-              </div>
-              
-              {/* Bottom gradient */}
-              <div className="sticky bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black via-black/70 to-transparent z-10 pointer-events-none -mt-20" />
-            </>
-          ) : (
-            <div className="h-full overflow-y-auto py-6">
-              <div className="max-w-2xl mx-auto whitespace-pre-wrap text-white/80 text-sm sm:text-base leading-relaxed">
-                {lyrics.plainLyrics}
-              </div>
+        {/* Lyrics Content */}
+        {viewMode === 'synced' ? (
+          <div 
+            ref={containerRef}
+            className="flex-1 relative overflow-y-auto overflow-x-hidden"
+            onScroll={handleUserScroll}
+            onTouchMove={handleUserScroll}
+          >
+            {/* Top fade gradient */}
+            <div className="sticky top-0 left-0 right-0 h-24 bg-gradient-to-b from-black via-black/80 to-transparent z-10 pointer-events-none" />
+            
+            {/* Lyrics with vertical padding for centering */}
+            <div 
+              className="max-w-2xl mx-auto relative"
+              style={{ 
+                paddingTop: 'calc(50vh - 80px)',
+                paddingBottom: 'calc(50vh - 80px)',
+                marginTop: '-96px', // Offset the sticky gradient
+              }}
+            >
+              {syncedLines.map((line, index) => (
+                <LyricLine
+                  key={index}
+                  line={line}
+                  isCurrent={index === currentLineIndex}
+                  isPast={index < currentLineIndex}
+                  distanceFromCurrent={index - currentLineIndex}
+                  onRef={index === currentLineIndex ? (el) => { currentLineRef.current = el; } : undefined}
+                />
+              ))}
             </div>
-          )}
-        </div>
+            
+            {/* Bottom fade gradient */}
+            <div className="sticky bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-black via-black/80 to-transparent z-10 pointer-events-none" />
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6">
+            <div className="max-w-2xl mx-auto whitespace-pre-wrap text-white/80 text-sm sm:text-base leading-relaxed">
+              {lyrics.plainLyrics}
+            </div>
+          </div>
+        )}
+        
+        {/* Auto-scroll indicator */}
+        {!isAutoScrollEnabled && viewMode === 'synced' && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-white/60 z-20">
+            Scrolling paused · Will resume automatically
+          </div>
+        )}
       </div>
     );
   }

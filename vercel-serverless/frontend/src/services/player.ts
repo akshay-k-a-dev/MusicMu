@@ -315,15 +315,45 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
         onError: (event: any) => {
           const errorCode = event.data;
           let errorMessage = 'Playback error';
+          let shouldRetry = false;
           
           // Error codes: 2 = invalid ID, 5 = HTML5 error, 100 = not found, 101/150 = restricted
           if (errorCode === 100 || errorCode === 101 || errorCode === 150) {
             errorMessage = 'Video not available or restricted';
           } else if (errorCode === 5) {
             errorMessage = 'Video player error';
+            shouldRetry = true; // HTML5 errors are often temporary
+          } else if (errorCode === 2) {
+            errorMessage = 'Invalid video';
           }
           
           console.error('🚫 YouTube error:', errorCode, errorMessage);
+          
+          const { queue, currentTrack } = get();
+          
+          // If queue has items, don't set error state - just skip to next
+          if (queue.length > 0) {
+            console.log('⏭️ Error but queue has items, skipping to next...');
+            setTimeout(() => get().next(), 1000);
+            return;
+          }
+          
+          // If retryable error and we have a current track, try to replay
+          if (shouldRetry && currentTrack) {
+            console.log('🔄 Retryable error, attempting to reload current track...');
+            set({ state: 'loading', error: null });
+            setTimeout(() => {
+              const { ytPlayer } = get();
+              if (ytPlayer && currentTrack) {
+                ytPlayer.loadVideoById({
+                  videoId: currentTrack.videoId,
+                  startSeconds: 0,
+                });
+              }
+            }, 1500);
+            return;
+          }
+          
           set({ state: 'error', error: errorMessage });
           // Try next track on error
           setTimeout(() => get().next(), 2000);
@@ -365,11 +395,18 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
           
           try {
             const currentState = get().state;
+            const currentQueue = get().queue;
             const ytState = currentPlayer.getPlayerState();
             
             if (currentState === 'playing' && ytState === YT.PlayerState.PAUSED) {
               console.log('🔄 Background monitor: resuming paused playback...');
               currentPlayer.playVideo();
+            }
+            
+            // Also check for error state and try to recover if queue has items
+            if (currentState === 'error' && currentQueue.length > 0) {
+              console.log('🔄 Background recovery: queue has items, playing next...');
+              get().next();
             }
           } catch (e) {
             // Player might be destroyed
@@ -377,8 +414,17 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
           }
         }, 500); // Check every 500ms while in background
         
-        // Clear monitor after 30 seconds to avoid battery drain
-        setTimeout(() => clearInterval(backgroundMonitor), 30000);
+        // Keep monitor running as long as queue has items, otherwise timeout after 30s
+        const checkMonitorTimeout = () => {
+          const { queue, state } = get();
+          if (queue.length > 0 || state === 'playing') {
+            // Still have queue or playing, check again in 30s
+            setTimeout(checkMonitorTimeout, 30000);
+          } else {
+            clearInterval(backgroundMonitor);
+          }
+        };
+        setTimeout(checkMonitorTimeout, 30000);
       }
     };
     
@@ -537,6 +583,14 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
   togglePlay: () => {
     const { ytPlayer, state, currentTrack, ytPlayerReady } = get();
     
+    // Auto-recovery: if player is in error or idle state with a track, try to play it
+    if ((state === 'error' || state === 'idle') && currentTrack) {
+      console.log('🔄 Auto-recovery: attempting to replay current track...');
+      set({ error: null }); // Clear any error
+      get().play(currentTrack);
+      return;
+    }
+    
     if (!currentTrack || !ytPlayer || !ytPlayerReady) return;
 
     if (state === 'playing') {
@@ -545,9 +599,6 @@ export const usePlayer = create<PlayerStore>((set, get) => ({
     } else if (state === 'paused') {
       ytPlayer.playVideo();
       mediaSessionManager.updatePlaybackState('playing');
-    } else if (state === 'idle' && currentTrack) {
-      // Reload current track
-      get().play(currentTrack);
     }
   },
 

@@ -57,36 +57,51 @@ export function parseSyncedLyrics(syncedLyrics: string): SyncedLine[] {
 function extractTitleCombinations(title: string): { track: string; artist: string }[] {
   const combinations: { track: string; artist: string }[] = [];
   
-  // Clean the title - remove common suffixes
+  // Clean the title - remove common suffixes and features
   let cleanTitle = title
     .replace(/\(Official.*?\)/gi, '')
     .replace(/\(Audio.*?\)/gi, '')
     .replace(/\(Lyric.*?\)/gi, '')
     .replace(/\(Music.*?\)/gi, '')
+    .replace(/\(HD.*?\)/gi, '')
+    .replace(/\(HQ.*?\)/gi, '')
+    .replace(/\(4K.*?\)/gi, '')
+    .replace(/\(Video.*?\)/gi, '')
     .replace(/\[Official.*?\]/gi, '')
     .replace(/\[Audio.*?\]/gi, '')
     .replace(/\[Lyric.*?\]/gi, '')
+    .replace(/\[HD.*?\]/gi, '')
     .replace(/Official Video/gi, '')
     .replace(/Official Audio/gi, '')
     .replace(/Lyrics/gi, '')
-    .replace(/HD|HQ|4K/gi, '')
-    .replace(/ft\.|feat\./gi, 'ft')
+    .replace(/\s+HD\s*/gi, ' ')
+    .replace(/\s+HQ\s*/gi, ' ')
+    .replace(/\s+4K\s*/gi, ' ')
+    .replace(/\s*ft\.?\s+[^-|]+$/gi, '') // Remove "ft. Someone" at the end
+    .replace(/\s*feat\.?\s+[^-|]+$/gi, '') // Remove "feat. Someone" at the end
+    .replace(/\s+/g, ' ') // Normalize spaces
     .trim();
   
   // Try splitting by " - "
   if (cleanTitle.includes(' - ')) {
-    const parts = cleanTitle.split(' - ').map(p => p.trim());
+    const parts = cleanTitle.split(' - ').map(p => p.trim()).filter(p => p);
     if (parts.length >= 2) {
-      // Artist - Song
-      combinations.push({ track: parts[1], artist: parts[0] });
+      // Also clean ft/feat from track parts
+      const cleanTrack = (s: string) => s
+        .replace(/\s*ft\.?\s+.*$/gi, '')
+        .replace(/\s*feat\.?\s+.*$/gi, '')
+        .trim();
+      
+      // Artist - Song (most common for YouTube)
+      combinations.push({ track: cleanTrack(parts[1]), artist: parts[0] });
       // Song - Artist
-      combinations.push({ track: parts[0], artist: parts[1] });
+      combinations.push({ track: cleanTrack(parts[0]), artist: parts[1] });
     }
   }
   
   // Try splitting by " | "
   if (cleanTitle.includes(' | ')) {
-    const parts = cleanTitle.split(' | ').map(p => p.trim());
+    const parts = cleanTitle.split(' | ').map(p => p.trim()).filter(p => p);
     if (parts.length >= 2) {
       combinations.push({ track: parts[0], artist: parts[1] });
       combinations.push({ track: parts[1], artist: parts[0] });
@@ -101,7 +116,7 @@ function extractTitleCombinations(title: string): { track: string; artist: strin
 
 /**
  * Get lyrics from LRCLIB API using search endpoint
- * Retries with different title/artist combinations if initial search fails
+ * Uses sequential requests with reasonable timeouts
  */
 export async function getLyrics(
   trackName: string,
@@ -110,15 +125,22 @@ export async function getLyrics(
 ): Promise<LyricsData | null> {
   const targetDuration = Math.round(duration);
   
-  // Helper to search and find best match
-  async function searchLyricsApi(track: string, artist: string): Promise<LyricsData | null> {
+  // Helper to search with timeout
+  async function searchLyricsApi(track: string, artist: string, timeout: number = 8000): Promise<LyricsData | null> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
     try {
       const searchParams = new URLSearchParams({
         track_name: track,
         artist_name: artist,
       });
 
-      const response = await fetch(`${API_BASE}/lyrics?${searchParams.toString()}`);
+      const response = await fetch(`${API_BASE}/lyrics?${searchParams.toString()}`, {
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) return null;
 
@@ -126,34 +148,49 @@ export async function getLyrics(
       
       if (!results || results.length === 0) return null;
 
-      // Find best match by duration (within 10 seconds for more flexibility)
+      // Find best match by duration (within 20 seconds for flexibility)
       const bestMatch = results.find((r) => 
-        Math.abs(r.duration - targetDuration) <= 10
+        Math.abs(r.duration - targetDuration) <= 20
       ) || results[0];
       
-      // Only return if it has lyrics
+      // Return if it has any lyrics (synced or plain)
       if (bestMatch && (bestMatch.syncedLyrics || bestMatch.plainLyrics)) {
         return bestMatch;
       }
       return null;
-    } catch {
+    } catch (error) {
+      clearTimeout(timeoutId);
+      // Log timeout for debugging but don't fail
+      console.warn('Lyrics fetch timeout/error for:', track);
       return null;
     }
   }
   
-  // Try 1: Original artist + track name
-  let result = await searchLyricsApi(trackName, artistName);
-  if (result) return result;
-  
-  // Try 2: Use combinations extracted from the title
+  // Extract cleaned title combinations first (more likely to match)
   const combinations = extractTitleCombinations(trackName);
-  for (const combo of combinations) {
-    result = await searchLyricsApi(combo.track, combo.artist || artistName);
+  console.log('📝 Lyrics search combinations:', combinations.slice(0, 2));
+  
+  // Try 1: First cleaned combination (Artist - Song format extracted)
+  if (combinations.length > 0) {
+    const firstCombo = combinations[0];
+    const artist = firstCombo.artist || artistName;
+    console.log('📝 Try 1:', firstCombo.track, 'by', artist);
+    let result = await searchLyricsApi(firstCombo.track, artist, 8000);
     if (result) return result;
   }
   
-  // Try 3: Just the track name without artist
-  result = await searchLyricsApi(trackName, '');
+  // Try 2: Second combination (Song - Artist format)
+  if (combinations.length > 1) {
+    const secondCombo = combinations[1];
+    const artist = secondCombo.artist || artistName;
+    console.log('📝 Try 2:', secondCombo.track, 'by', artist);
+    let result = await searchLyricsApi(secondCombo.track, artist, 6000);
+    if (result) return result;
+  }
+  
+  // Try 3: Original track name with artist (fallback for already clean titles)
+  console.log('📝 Try 3 (fallback):', trackName, 'by', artistName);
+  let result = await searchLyricsApi(trackName, artistName, 5000);
   if (result) return result;
   
   return null;

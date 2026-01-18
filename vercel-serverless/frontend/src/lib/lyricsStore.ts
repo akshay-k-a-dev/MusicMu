@@ -27,8 +27,9 @@ interface LyricsStore {
   setCurrentTrack: (trackId: string | null) => void;
 }
 
-// Cache lyrics for 1 hour
+// Cache lyrics for 1 hour, but failed lookups only for 5 minutes
 const CACHE_TTL = 60 * 60 * 1000;
+const FAILED_CACHE_TTL = 5 * 60 * 1000;
 
 export const useLyricsStore = create<LyricsStore>((set, get) => ({
   cache: new Map(),
@@ -38,8 +39,11 @@ export const useLyricsStore = create<LyricsStore>((set, get) => ({
     const entry = get().cache.get(trackId);
     if (!entry) return null;
     
+    // Use shorter TTL for failed lookups (no lyrics)
+    const ttl = entry.lyrics ? CACHE_TTL : FAILED_CACHE_TTL;
+    
     // Check if cache is still valid
-    if (Date.now() - entry.fetchedAt > CACHE_TTL) {
+    if (Date.now() - entry.fetchedAt > ttl) {
       get().clearTrack(trackId);
       return null;
     }
