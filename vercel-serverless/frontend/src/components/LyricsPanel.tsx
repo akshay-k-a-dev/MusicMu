@@ -297,13 +297,6 @@ export function LyricsPanel({ trackTitle, artistName, duration, currentTime, tra
             </div>
           </div>
         )}
-        
-        {/* Auto-scroll indicator */}
-        {!isAutoScrollEnabled && viewMode === 'synced' && (
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-sm px-3 py-1.5 rounded-full text-xs text-white/60 z-20">
-            Scrolling paused · Will resume automatically
-          </div>
-        )}
       </div>
     );
   }
