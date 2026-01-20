@@ -46,28 +46,36 @@ export function TrackPage() {
 
         const track = await response.json();
         
-        console.log('🎵 TrackPage: Loading track:', track);
+        console.log('🎵 TrackPage: Fetched track from API:', JSON.stringify(track, null, 2));
         
-        // Play the track
-        await play({
+        // Ensure we have all required fields
+        if (!track.videoId || !track.title) {
+          throw new Error('Invalid track data received from API');
+        }
+        
+        const trackData = {
           videoId: track.videoId,
           title: track.title,
           artist: track.artist || 'Unknown Artist',
-          thumbnail: track.thumbnail,
-          duration: track.duration
-        });
+          thumbnail: track.thumbnail || '',
+          duration: track.duration || 0
+        };
+        
+        console.log('🎵 TrackPage: Playing track with data:', JSON.stringify(trackData, null, 2));
+        
+        // Play the track
+        await play(trackData);
 
-        // Wait for player state to actually update
-        const maxWait = 2000; // 2 seconds max
-        const startTime = Date.now();
-        let playerState = usePlayer.getState();
+        // Give extra time for state to propagate through React/Zustand
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        while (playerState.currentTrack?.videoId !== videoId && (Date.now() - startTime) < maxWait) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-          playerState = usePlayer.getState();
-        }
-        
-        console.log('✅ TrackPage: Player state updated, currentTrack:', playerState.currentTrack);
+        // Check final state before navigation
+        const finalState = usePlayer.getState();
+        console.log('✅ TrackPage: Final player state before navigation:', {
+          currentTrack: finalState.currentTrack,
+          state: finalState.state,
+          isPlayerVisible: finalState.isPlayerVisible
+        });
 
         // Navigate to home page where the player will be visible
         navigate('/');
