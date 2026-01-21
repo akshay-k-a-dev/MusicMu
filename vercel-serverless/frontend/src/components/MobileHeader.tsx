@@ -10,7 +10,7 @@ export default function MobileHeader() {
       <div className="flex items-center justify-between px-4 h-14">
         {/* Logo */}
         <div>
-          <h1 className="text-lg font-bold text-white">MusicMu</h1>
+          <h1 className="text-lg font-bold text-white">Cantio</h1>
         </div>
 
         {/* Login/Profile Button */}

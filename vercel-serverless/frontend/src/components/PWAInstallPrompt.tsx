@@ -77,7 +77,7 @@ export function PWAInstallPrompt() {
                 <span className="text-3xl">🎵</span>
               </div>
               <div className="flex-1">
-                <h3 className="text-white font-bold text-lg mb-1">Install MusicMu</h3>
+                <h3 className="text-white font-bold text-lg mb-1">Install Cantio</h3>
                 <p className="text-gray-300 text-sm">Get the full app experience with offline support and quick access</p>
               </div>
             </div>

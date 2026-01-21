@@ -169,7 +169,7 @@ export function HomePage() {
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
-            Welcome to MusicMu
+            Welcome to Cantio
           </h1>
           <p className="text-sm sm:text-base text-gray-400 max-w-md">
             Search for songs to start listening. No ads, unlimited skips, no interruptions.

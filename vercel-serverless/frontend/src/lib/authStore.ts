@@ -25,7 +25,7 @@ interface AuthState {
 
 // Create dedicated auth storage instance
 const authStorage = localforage.createInstance({
-  name: 'musicmu',
+  name: 'cantio',
   storeName: 'auth_data',
   description: 'Persistent authentication storage'
 });

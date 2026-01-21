@@ -22,7 +22,7 @@ export default function Sidebar() {
     <div className="w-52 bg-[#0a0a0a] h-full flex flex-col py-5 px-3 border-r border-white/5">
       {/* Logo */}
       <div className="mb-6 px-3">
-        <h1 className="text-xl font-bold text-white">MusicMu</h1>
+        <h1 className="text-xl font-bold text-white">Cantio</h1>
         <p className="text-[10px] text-gray-500 mt-0.5">Ad-Free Music</p>
       </div>
 

@@ -190,6 +190,21 @@ export const usePlaylist = create<PlaylistState>((set, get) => ({
       const error = await response.json();
       throw new Error(error.error || 'Failed to add track to playlist');
     }
+
+    // On success, update current playlist UI if viewing it so the new track appears immediately
+    const data = await response.json();
+    const { currentPlaylist } = get();
+
+    if (currentPlaylist && currentPlaylist.id === playlistId) {
+      set({
+        currentPlaylist: {
+          ...currentPlaylist,
+          // Prepend newest track so latest appears first
+          tracks: [data.track, ...(currentPlaylist.tracks || [])],
+          _count: { tracks: (currentPlaylist._count?.tracks || 0) + 1 }
+        }
+      });
+    }
   },
 
   removeTrackFromPlaylist: async (playlistId: string, trackId: string) => {

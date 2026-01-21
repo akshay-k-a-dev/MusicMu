@@ -148,7 +148,7 @@ export default function PlayerBar() {
     
     const shareData = {
       title: currentTrack.title,
-      text: `Check out "${currentTrack.title}" by ${currentTrack.artist} on MusicMu`,
+      text: `Check out "${currentTrack.title}" by ${currentTrack.artist} on Cantio`,
       url: shareUrl
     };
     

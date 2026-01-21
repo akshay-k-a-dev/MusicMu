@@ -1,13 +1,13 @@
-// Service Worker for MusicMu PWA
+// Service Worker for Cantio PWA
 const CACHE_VERSION = Date.now(); // Change on every deployment
-const CACHE_NAME = `musicmu-v${CACHE_VERSION}`;
+const CACHE_NAME = `cantio-v${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
 const STATIC_ASSETS = [
   '/offline.html',
-  '/pwa-192.png',
-  '/pwa-512.png',
-  '/icon.svg'
+  '/icon.png',
+  '/icon.ico',
+  '/manifest.json'
 ];
 
 // Install event - cache static assets

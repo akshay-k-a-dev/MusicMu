@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => {
         overlay: false,
       },
       allowedHosts: [
-        'musicmu.local',
+        'cantio.local',
         '.local',  // allow any *.local hostname
         'localhost',
       ],

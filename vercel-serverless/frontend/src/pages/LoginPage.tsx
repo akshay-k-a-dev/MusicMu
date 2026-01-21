@@ -42,7 +42,7 @@ export default function LoginPage() {
         <div className="glass p-8 rounded-2xl">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-2">Welcome Back</h1>
-            <p className="text-gray-400">Sign in to your MusicMu account</p>
+            <p className="text-gray-400">Sign in to your Cantio account</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">

@@ -38,7 +38,7 @@ const CACHE_EXPIRY_DAYS = 30;
 
 // Initialize localforage
 const store = localforage.createInstance({
-  name: 'musicmu',
+  name: 'cantio',
   storeName: 'guest_data',
 });
 
@@ -140,7 +140,8 @@ export class CacheManager {
 
     // Avoid duplicates
     if (!playlist.tracks.find(t => t.videoId === track.videoId)) {
-      playlist.tracks.push(track);
+      // Add newest tracks to the front so latest added appears first
+      playlist.tracks.unshift(track);
       await this.save();
     }
   }
