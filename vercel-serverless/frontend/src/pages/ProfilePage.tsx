@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/authStore';
 import { motion } from 'framer-motion';
-import { User, LogOut, Lock, Eye, EyeOff } from 'lucide-react';
+import { User, LogOut, Lock, Eye, EyeOff, Download, Smartphone, MonitorPlay, Apple } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../lib/authStore';
 import { SyncButton } from '../components/SyncButton';
@@ -10,6 +10,7 @@ export default function ProfilePage() {
   const navigate = useNavigate();
   const { user, isAuthenticated, logout } = useAuth();
   const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [isElectron, setIsElectron] = useState(false);
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
@@ -28,6 +29,8 @@ export default function ProfilePage() {
     if (!isAuthenticated) {
       navigate('/login');
     }
+    // Check if running in Electron
+    setIsElectron(!!(window as any).electronAPI);
   }, [isAuthenticated, navigate]);
 
   if (!user) return null;
@@ -263,6 +266,103 @@ export default function ProfilePage() {
             </motion.form>
           )}
         </div>
+
+        {/* Desktop Downloads Section - Hidden in Electron */}
+        {!isElectron && (
+          <div className="mt-8 pt-8 border-t border-white/10">
+            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Download Desktop App
+            </h2>
+            
+            <div className="space-y-4">
+              {/* Windows */}
+              <a
+                href="https://github.com/akshay-k-a-dev/Cantio/releases/download/cantio-initial/Cantio.Setup.1.0.0.exe"
+                className="block p-4 bg-black/30 hover:bg-black/50 border border-white/10 hover:border-purple-500/50 rounded-xl transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+                      <MonitorPlay className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold group-hover:text-purple-400 transition-colors">Windows</h3>
+                      <p className="text-sm text-gray-400">Cantio Setup 1.0.0.exe</p>
+                    </div>
+                  </div>
+                  <Download className="w-5 h-5 text-gray-400 group-hover:text-purple-400 transition-colors" />
+                </div>
+              </a>
+
+              {/* Linux DEB */}
+              <a
+                href="https://github.com/akshay-k-a-dev/Cantio/releases/download/cantio-initial/cantio-desktop_1.0.0_amd64.deb"
+                className="block p-4 bg-black/30 hover:bg-black/50 border border-white/10 hover:border-purple-500/50 rounded-xl transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center">
+                      <MonitorPlay className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold group-hover:text-purple-400 transition-colors">Linux (Debian/Ubuntu)</h3>
+                      <p className="text-sm text-gray-400">cantio-desktop_1.0.0_amd64.deb</p>
+                    </div>
+                  </div>
+                  <Download className="w-5 h-5 text-gray-400 group-hover:text-purple-400 transition-colors" />
+                </div>
+              </a>
+
+              {/* Linux AppImage */}
+              <a
+                href="https://github.com/akshay-k-a-dev/Cantio/releases/download/cantio-initial/Cantio-1.0.0.AppImage"
+                className="block p-4 bg-black/30 hover:bg-black/50 border border-white/10 hover:border-purple-500/50 rounded-xl transition-all group"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+                      <MonitorPlay className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold group-hover:text-purple-400 transition-colors">Linux (AppImage)</h3>
+                      <p className="text-sm text-gray-400">Cantio-1.0.0.AppImage</p>
+                    </div>
+                  </div>
+                  <Download className="w-5 h-5 text-gray-400 group-hover:text-purple-400 transition-colors" />
+                </div>
+              </a>
+
+              {/* Android */}
+              <div className="p-4 bg-black/20 border border-white/10 rounded-xl opacity-60">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-lime-500 flex items-center justify-center">
+                      <Smartphone className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">Android</h3>
+                      <p className="text-sm text-gray-400">Coming Soon</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* iOS/macOS */}
+              <div className="p-4 bg-black/20 border border-white/10 rounded-xl opacity-60">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-500 to-gray-600 flex items-center justify-center">
+                    <Apple className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold">iPhone/Mac</h3>
+                    <p className="text-sm text-gray-400">Sorry, you're not on my list yet. Please use the web app.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-6 pt-6 border-t border-white/10 text-center text-sm text-gray-400">
           <p>Member since {new Date(user.createdAt).toLocaleDateString()}</p>

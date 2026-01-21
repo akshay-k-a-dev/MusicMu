@@ -19,6 +19,7 @@ import PlayerBar from './components/PlayerBar';
 import MobileNav from './components/MobileNav';
 import MobileHeader from './components/MobileHeader';
 import { BlendInviteNotifications } from './components/BlendInviteNotifications';
+import DownloadPopup from './components/DownloadPopup';
 
 function AppContent() {
   const isPlayerVisible = usePlayer((state) => state.isPlayerVisible);
@@ -74,6 +75,9 @@ function AppContent() {
       
       {/* Blend Invite Notifications */}
       <BlendInviteNotifications />
+      
+      {/* Download Popup - First visit only */}
+      <DownloadPopup />
     </div>
   );
 }
